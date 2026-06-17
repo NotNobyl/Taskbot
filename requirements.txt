@@ -1,0 +1,5 @@
+fastapi==0.115.5
+uvicorn[standard]==0.32.0
+firebase-admin==6.5.0
+discord.py==2.4.0
+twilio==9.3.5

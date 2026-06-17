@@ -1,0 +1,10 @@
+{
+  "appId": "com.jacob.taskbot",
+  "appName": "TaskBot",
+  "webDir": "static",
+  "plugins": {
+    "PushNotifications": {
+      "presentationOptions": ["badge", "sound", "alert"]
+    }
+  }
+}

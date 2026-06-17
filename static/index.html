@@ -1,0 +1,1098 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#1a1a2e">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="TaskBot">
+<title>TaskBot</title>
+<link rel="manifest" href="/static/manifest.json">
+<style>
+  :root {
+    --bg: #0f0f1a;
+    --surface: #1a1a2e;
+    --surface2: #22223b;
+    --accent: #7c6ff7;
+    --accent2: #a78bfa;
+    --bot-bubble: #22223b;
+    --user-bubble: #4c3bcf;
+    --text: #e2e2f0;
+    --text-dim: #9090b0;
+    --border: #2e2e50;
+    --green: #4ade80;
+    --red: #f87171;
+    --yellow: #fbbf24;
+    --radius: 18px;
+    --radius-sm: 10px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    overflow: hidden;
+  }
+
+  #app {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    max-width: 480px;
+    margin: 0 auto;
+    position: relative;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    position: relative;
+    z-index: 10;
+  }
+
+  .logo {
+    width: 36px; height: 36px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; flex-shrink: 0;
+  }
+
+  .header-info { flex: 1; }
+  .header-info h1 { font-size: 16px; font-weight: 700; }
+  .header-info p { font-size: 12px; color: var(--text-dim); }
+  .header-btns { display: flex; gap: 8px; }
+
+  .icon-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 10px;
+    color: var(--text);
+    cursor: pointer;
+    font-size: 14px;
+    transition: background 0.15s;
+  }
+  .icon-btn:hover { background: var(--border); }
+
+  #task-panel {
+    position: absolute;
+    top: 0; right: -100%;
+    width: 100%; height: 100%;
+    background: var(--surface);
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    transition: right 0.3s cubic-bezier(.4,0,.2,1);
+  }
+  #task-panel.open { right: 0; }
+
+  .panel-header {
+    display: flex; align-items: center; gap: 10px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .panel-header h2 { flex: 1; font-size: 16px; }
+
+  .close-btn {
+    background: none; border: none;
+    color: var(--text-dim); font-size: 20px;
+    cursor: pointer; padding: 4px 8px; border-radius: 6px;
+  }
+  .close-btn:hover { background: var(--surface2); color: var(--text); }
+
+  #task-list-container {
+    flex: 1; overflow-y: auto; padding: 12px;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+
+  .task-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 12px; padding: 12px 14px;
+    display: flex; gap: 10px; align-items: flex-start;
+    animation: slideIn 0.2s ease;
+  }
+  @keyframes slideIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
+
+  .task-pri { font-size: 14px; flex-shrink: 0; margin-top: 1px; }
+  .task-body { flex: 1; min-width: 0; }
+  .task-title { font-size: 14px; font-weight: 500; word-break: break-word; }
+  .task-meta {
+    font-size: 11px; color: var(--text-dim);
+    margin-top: 3px; display: flex; gap: 8px; flex-wrap: wrap;
+  }
+
+  .done-btn {
+    background: none; border: 1px solid var(--border);
+    border-radius: 8px; color: var(--text-dim);
+    font-size: 16px; cursor: pointer; padding: 2px 8px; flex-shrink: 0;
+    transition: all 0.15s;
+  }
+  .done-btn:hover { background: var(--green); color: #000; border-color: var(--green); }
+
+  .empty-state { text-align: center; color: var(--text-dim); padding: 40px 20px; font-size: 14px; }
+  .empty-state .emoji { font-size: 40px; margin-bottom: 10px; }
+
+  #chat {
+    flex: 1; overflow-y: auto; padding: 16px;
+    display: flex; flex-direction: column; gap: 10px;
+    scroll-behavior: smooth;
+  }
+
+  .bubble-wrap {
+    display: flex; flex-direction: column; max-width: 85%;
+    animation: fadeUp 0.2s ease;
+  }
+  @keyframes fadeUp { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
+
+  .bubble-wrap.user { align-self: flex-end; align-items: flex-end; }
+  .bubble-wrap.bot  { align-self: flex-start; align-items: flex-start; }
+
+  .bubble {
+    padding: 10px 14px; border-radius: var(--radius);
+    font-size: 14px; line-height: 1.5;
+    word-break: break-word; white-space: pre-wrap;
+  }
+  .bubble-wrap.user .bubble {
+    background: var(--user-bubble);
+    border-bottom-right-radius: 4px; color: #fff;
+  }
+  .bubble-wrap.bot .bubble {
+    background: var(--bot-bubble);
+    border-bottom-left-radius: 4px;
+    border: 1px solid var(--border);
+  }
+  .bubble b, .bubble strong { color: var(--accent2); font-weight: 600; }
+
+  .bubble-time { font-size: 11px; color: var(--text-dim); margin-top: 3px; padding: 0 4px; }
+
+  .typing-indicator {
+    display: flex; gap: 4px; padding: 12px 16px;
+    background: var(--bot-bubble); border-radius: var(--radius);
+    border-bottom-left-radius: 4px; border: 1px solid var(--border); width: fit-content;
+  }
+  .typing-dot {
+    width: 6px; height: 6px; background: var(--text-dim);
+    border-radius: 50%; animation: bounce 1.2s infinite;
+  }
+  .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+  .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes bounce {
+    0%,60%,100% { transform: translateY(0); }
+    30% { transform: translateY(-6px); }
+  }
+
+  .quick-actions {
+    display: flex; gap: 6px; flex-wrap: wrap;
+    padding: 6px 16px; flex-shrink: 0;
+  }
+  .quick-btn {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 20px; padding: 5px 12px; font-size: 12px;
+    color: var(--text); cursor: pointer; white-space: nowrap; transition: all 0.15s;
+  }
+  .quick-btn:hover { background: var(--accent); border-color: var(--accent); }
+
+  #input-bar {
+    display: flex; gap: 8px; padding: 10px 12px;
+    background: var(--surface); border-top: 1px solid var(--border);
+    flex-shrink: 0;
+    padding-bottom: max(10px, env(safe-area-inset-bottom));
+  }
+
+  #msg-input {
+    flex: 1; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 22px; padding: 10px 16px; color: var(--text);
+    font-size: 15px; outline: none; resize: none; max-height: 100px;
+    line-height: 1.4; font-family: inherit; transition: border-color 0.15s;
+  }
+  #msg-input:focus { border-color: var(--accent); }
+  #msg-input::placeholder { color: var(--text-dim); }
+
+  #send-btn {
+    width: 42px; height: 42px; background: var(--accent);
+    border: none; border-radius: 50%; color: #fff; font-size: 18px;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; align-self: flex-end; transition: background 0.15s, transform 0.1s;
+  }
+  #send-btn:hover { background: var(--accent2); }
+  #send-btn:active { transform: scale(0.92); }
+  #send-btn:disabled { background: var(--border); cursor: not-allowed; }
+
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  #task-badge {
+    background: var(--accent); color: #fff;
+    border-radius: 10px; font-size: 11px; padding: 1px 6px;
+    font-weight: 700; display: none;
+  }
+  #task-badge.show { display: inline; }
+
+  /* ── Knowledge Base styles ── */
+  #kb-panel {
+    position: absolute;
+    top: 0; left: -100%;
+    width: 100%; height: 100%;
+    background: var(--surface);
+    z-index: 20;
+    display: flex; flex-direction: column;
+    transition: left 0.3s cubic-bezier(.4,0,.2,1);
+  }
+  #kb-panel.open { left: 0; }
+
+  .kb-search-bar {
+    display: flex; gap: 8px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .kb-search-bar input {
+    flex: 1; background: var(--surface2);
+    border: 1px solid var(--border); border-radius: 20px;
+    padding: 8px 14px; color: var(--text); font-size: 14px; outline: none;
+  }
+  .kb-search-bar input:focus { border-color: var(--accent); }
+  .kb-search-bar input::placeholder { color: var(--text-dim); }
+
+  .new-article-btn {
+    background: var(--accent); border: none; border-radius: 20px;
+    padding: 8px 14px; color: #fff; font-size: 13px;
+    font-weight: 600; cursor: pointer; white-space: nowrap; flex-shrink: 0;
+  }
+  .new-article-btn:hover { background: var(--accent2); }
+
+  #kb-list {
+    flex: 1; overflow-y: auto; padding: 10px;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+
+  .kb-card {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 12px; padding: 12px 14px; cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  .kb-card:hover { border-color: var(--accent); }
+  .kb-card-title { font-size: 14px; font-weight: 600; }
+  .kb-card-meta {
+    font-size: 11px; color: var(--text-dim);
+    margin-top: 4px; display: flex; gap: 8px; flex-wrap: wrap;
+  }
+  .kb-tag {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 20px; padding: 1px 8px; font-size: 11px; color: var(--accent2);
+  }
+
+  /* Article viewer */
+  #kb-viewer {
+    position: absolute; top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: var(--surface); z-index: 21;
+    display: none; flex-direction: column;
+  }
+  #kb-viewer.open { display: flex; }
+
+  .viewer-header {
+    display: flex; align-items: center; gap: 8px;
+    padding: 12px 14px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+  }
+  .viewer-header h2 { flex: 1; font-size: 15px; }
+  .viewer-actions { display: flex; gap: 6px; }
+
+  .action-btn {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 5px 10px; color: var(--text);
+    font-size: 12px; cursor: pointer; transition: background 0.15s;
+  }
+  .action-btn:hover { background: var(--border); }
+  .action-btn.danger:hover { background: var(--red); color: #000; border-color: var(--red); }
+
+  #kb-content {
+    flex: 1; overflow-y: auto; padding: 16px;
+    line-height: 1.7; font-size: 14px;
+  }
+
+  /* Markdown rendering */
+  #kb-content h1 { font-size: 20px; font-weight: 700; margin: 0 0 12px; color: var(--accent2); }
+  #kb-content h2 { font-size: 16px; font-weight: 700; margin: 18px 0 8px; color: var(--accent2); }
+  #kb-content h3 { font-size: 14px; font-weight: 700; margin: 14px 0 6px; color: var(--text); }
+  #kb-content p { margin: 0 0 10px; }
+  #kb-content ul, #kb-content ol { padding-left: 20px; margin: 0 0 10px; }
+  #kb-content li { margin: 4px 0; }
+  #kb-content code {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 4px; padding: 1px 5px; font-size: 12px; font-family: monospace;
+  }
+  #kb-content pre {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 12px; overflow-x: auto; margin: 0 0 10px;
+  }
+  #kb-content pre code { background: none; border: none; padding: 0; }
+  #kb-content blockquote {
+    border-left: 3px solid var(--accent); padding-left: 12px;
+    color: var(--text-dim); margin: 0 0 10px;
+  }
+  #kb-content strong { color: var(--accent2); font-weight: 600; }
+  #kb-content em { color: var(--text-dim); }
+  #kb-content hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+  #kb-content img {
+    max-width: 100%; border-radius: 8px; margin: 8px 0;
+    border: 1px solid var(--border);
+  }
+  #kb-content a { color: var(--accent2); }
+
+  /* Callout boxes for "unless" / warnings */
+  #kb-content .callout {
+    background: rgba(124,111,247,0.1); border: 1px solid var(--accent);
+    border-radius: 8px; padding: 10px 14px; margin: 10px 0;
+  }
+  #kb-content .callout.warn {
+    background: rgba(251,191,36,0.1); border-color: var(--yellow);
+  }
+  #kb-content .callout.danger {
+    background: rgba(248,113,113,0.1); border-color: var(--red);
+  }
+
+  /* Images section */
+  .kb-images-section { padding: 0 16px 16px; }
+  .kb-images-section h4 { font-size: 12px; color: var(--text-dim); margin-bottom: 8px; }
+  .kb-images-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+  .kb-image-thumb {
+    position: relative; cursor: pointer;
+  }
+  .kb-image-thumb img {
+    width: 80px; height: 60px; object-fit: cover;
+    border-radius: 6px; border: 1px solid var(--border);
+    transition: border-color 0.15s;
+  }
+  .kb-image-thumb img:hover { border-color: var(--accent); }
+  .kb-image-thumb .del-img {
+    position: absolute; top: -4px; right: -4px;
+    background: var(--red); color: #fff; border: none; border-radius: 50%;
+    width: 16px; height: 16px; font-size: 9px; cursor: pointer;
+    display: none; align-items: center; justify-content: center;
+  }
+  .kb-image-thumb:hover .del-img { display: flex; }
+
+  /* Image lightbox */
+  #kb-lightbox {
+    display: none; position: fixed; inset: 0; z-index: 100;
+    background: rgba(0,0,0,0.9); align-items: center; justify-content: center;
+  }
+  #kb-lightbox.open { display: flex; }
+  #kb-lightbox img { max-width: 95vw; max-height: 90vh; border-radius: 8px; }
+  #kb-lightbox-close {
+    position: absolute; top: 16px; right: 16px;
+    background: none; border: none; color: #fff; font-size: 28px; cursor: pointer;
+  }
+
+  /* Article editor */
+  #kb-editor {
+    position: absolute; top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: var(--surface); z-index: 22;
+    display: none; flex-direction: column;
+  }
+  #kb-editor.open { display: flex; }
+
+  .editor-header {
+    display: flex; align-items: center; gap: 8px;
+    padding: 12px 14px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+  }
+  .editor-header h2 { flex: 1; font-size: 15px; }
+
+  .save-btn {
+    background: var(--accent); border: none; border-radius: 8px;
+    padding: 6px 14px; color: #fff; font-size: 13px;
+    font-weight: 600; cursor: pointer;
+  }
+  .save-btn:hover { background: var(--accent2); }
+
+  .editor-fields { display: flex; flex-direction: column; gap: 8px; padding: 12px; flex-shrink: 0; }
+
+  .editor-fields input, .editor-fields .tag-input {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 12px; color: var(--text);
+    font-size: 14px; outline: none; width: 100%;
+  }
+  .editor-fields input:focus, .editor-fields .tag-input:focus { border-color: var(--accent); }
+  .editor-fields input::placeholder { color: var(--text-dim); }
+  .editor-fields label { font-size: 11px; color: var(--text-dim); margin-bottom: 2px; display: block; }
+
+  #kb-textarea {
+    flex: 1; background: var(--surface2); border: none;
+    border-top: 1px solid var(--border); padding: 14px 16px;
+    color: var(--text); font-size: 14px; outline: none;
+    resize: none; font-family: 'Menlo', 'Consolas', monospace;
+    line-height: 1.6;
+  }
+
+  .editor-toolbar {
+    display: flex; gap: 4px; padding: 6px 12px;
+    border-bottom: 1px solid var(--border); flex-shrink: 0; flex-wrap: wrap;
+  }
+  .tb-btn {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 6px; padding: 4px 8px; color: var(--text);
+    font-size: 12px; cursor: pointer;
+  }
+  .tb-btn:hover { background: var(--accent); border-color: var(--accent); }
+
+  .md-hint {
+    font-size: 11px; color: var(--text-dim); padding: 4px 12px; flex-shrink: 0;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <header>
+    <div class="logo">🤖</div>
+    <div class="header-info">
+      <h1>TaskBot</h1>
+      <p id="status-text">Type anything to add a task</p>
+    </div>
+    <div class="header-btns">
+      <button class="icon-btn" id="kb-btn" title="Knowledge Base">📚</button>
+      <button class="icon-btn" id="notif-btn" title="Enable notifications">🔔</button>
+      <button class="icon-btn" id="tasks-btn" title="View all tasks">
+        📋 <span id="task-badge"></span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Task panel (slides from right) -->
+  <div id="task-panel">
+    <div class="panel-header">
+      <h2>📋 Pending Tasks</h2>
+      <button class="close-btn" id="close-panel">✕</button>
+    </div>
+    <div id="task-list-container">
+      <div class="empty-state">
+        <div class="emoji">🎉</div>
+        <div>No pending tasks!</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Knowledge Base panel (slides from left) -->
+  <div id="kb-panel">
+    <div class="panel-header">
+      <h2>📚 Processes</h2>
+      <button class="close-btn" id="close-kb">✕</button>
+    </div>
+    <div class="kb-search-bar">
+      <input id="kb-search" placeholder="Search processes…" type="search">
+      <button class="new-article-btn" id="new-article-btn">+ New</button>
+    </div>
+    <div id="kb-list"></div>
+
+    <!-- Article viewer (inside KB panel) -->
+    <div id="kb-viewer">
+      <div class="viewer-header">
+        <button class="close-btn" id="close-viewer">←</button>
+        <h2 id="viewer-title"></h2>
+        <div class="viewer-actions">
+          <button class="action-btn" id="edit-article-btn">✏️ Edit</button>
+          <button class="action-btn danger" id="delete-article-btn">🗑️</button>
+        </div>
+      </div>
+      <div id="kb-content"></div>
+      <div class="kb-images-section" id="kb-images-section">
+        <h4>SCREENSHOTS</h4>
+        <div class="kb-images-grid" id="kb-images-grid"></div>
+        <label style="margin-top:8px;display:block;">
+          <input type="file" id="add-image-input" accept="image/*" multiple style="display:none">
+          <span class="action-btn" style="cursor:pointer;display:inline-block">📎 Add screenshot</span>
+        </label>
+      </div>
+    </div>
+
+    <!-- Article editor (inside KB panel) -->
+    <div id="kb-editor">
+      <div class="editor-header">
+        <button class="close-btn" id="close-editor">←</button>
+        <h2 id="editor-title-label">New Process</h2>
+        <button class="save-btn" id="save-article-btn">Save</button>
+      </div>
+      <div class="editor-fields">
+        <div>
+          <label>Title</label>
+          <input id="article-title-input" placeholder="e.g. Disable User Account on Leave">
+        </div>
+        <div>
+          <label>Tags (comma separated)</label>
+          <input id="article-tags-input" placeholder="user management, AD, offboarding">
+        </div>
+      </div>
+      <div class="editor-toolbar">
+        <button class="tb-btn" data-insert="## ">H2</button>
+        <button class="tb-btn" data-insert="### ">H3</button>
+        <button class="tb-btn" data-wrap="**">Bold</button>
+        <button class="tb-btn" data-insert="- ">List</button>
+        <button class="tb-btn" data-insert="1. ">Steps</button>
+        <button class="tb-btn" data-insert="> ⚠️ **Unless:** ">Unless</button>
+        <button class="tb-btn" data-insert="> ℹ️ **Note:** ">Note</button>
+        <button class="tb-btn" data-insert="---&#10;">Divider</button>
+        <button class="tb-btn" data-insert="\`\`\`&#10;&#10;\`\`\`">Code</button>
+      </div>
+      <div class="md-hint">Supports Markdown. Use &gt; ⚠️ **Unless:** for conditional steps.</div>
+      <textarea id="kb-textarea" placeholder="Write your process steps here…&#10;&#10;## Step 1 — Do X&#10;...&#10;&#10;> ⚠️ **Unless:** the account is shared — skip to step 4&#10;&#10;## Step 2 — Do Y"></textarea>
+    </div>
+  </div>
+
+  <!-- Image lightbox -->
+  <div id="kb-lightbox">
+    <button id="kb-lightbox-close">✕</button>
+    <img id="kb-lightbox-img" src="" alt="">
+  </div>
+
+  <div id="chat"></div>
+
+  <div class="quick-actions">
+    <button class="quick-btn" data-msg="list">📋 List tasks</button>
+    <button class="quick-btn" data-msg="next">🎯 What's next?</button>
+    <button class="quick-btn" data-msg="remind me in 1 hour">⏰ Remind in 1hr</button>
+  </div>
+
+  <div id="input-bar">
+    <textarea id="msg-input" placeholder="Add a task or ask what's next…" rows="1"></textarea>
+    <button id="send-btn">➤</button>
+  </div>
+
+</div>
+
+<!-- Capacitor core (injected when running as Android app) -->
+<script>
+// ── Config ────────────────────────────────────────────────────────────────
+// Your Railway URL — update this after deploying
+const API = 'https://taskbot-production.up.railway.app';
+
+// Detect if running inside Capacitor (Android app) or browser
+const IS_NATIVE = window.Capacitor && window.Capacitor.isNativePlatform();
+
+// ── DOM ───────────────────────────────────────────────────────────────────
+const chat      = document.getElementById('chat');
+const input     = document.getElementById('msg-input');
+const sendBtn   = document.getElementById('send-btn');
+const tasksBtn  = document.getElementById('tasks-btn');
+const taskPanel = document.getElementById('task-panel');
+const closePanel= document.getElementById('close-panel');
+const taskList  = document.getElementById('task-list-container');
+const badge     = document.getElementById('task-badge');
+const statusText= document.getElementById('status-text');
+const notifBtn  = document.getElementById('notif-btn');
+
+// ── Markdown-lite renderer ────────────────────────────────────────────────
+function renderText(text) {
+  return text
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/`(.+?)`/g, '<code>$1</code>');
+}
+
+// ── Chat bubbles ──────────────────────────────────────────────────────────
+function nowTime() {
+  return new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+}
+
+function addBubble(text, role) {
+  const wrap = document.createElement('div');
+  wrap.className = `bubble-wrap ${role}`;
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+  bubble.innerHTML = renderText(text);
+  const time = document.createElement('div');
+  time.className = 'bubble-time';
+  time.textContent = nowTime();
+  wrap.appendChild(bubble);
+  wrap.appendChild(time);
+  chat.appendChild(wrap);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+function showTyping() {
+  const wrap = document.createElement('div');
+  wrap.className = 'bubble-wrap bot';
+  wrap.id = 'typing';
+  wrap.innerHTML = `<div class="typing-indicator">
+    <div class="typing-dot"></div>
+    <div class="typing-dot"></div>
+    <div class="typing-dot"></div>
+  </div>`;
+  chat.appendChild(wrap);
+  chat.scrollTop = chat.scrollHeight;
+}
+function hideTyping() {
+  const el = document.getElementById('typing');
+  if (el) el.remove();
+}
+
+// ── Send message ──────────────────────────────────────────────────────────
+async function sendMessage(text) {
+  if (!text.trim()) return;
+  addBubble(text, 'user');
+  input.value = '';
+  input.style.height = 'auto';
+  sendBtn.disabled = true;
+  showTyping();
+  try {
+    const res = await fetch(`${API}/chat`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({text}),
+    });
+    const data = await res.json();
+    hideTyping();
+    addBubble(data.reply, 'bot');
+    refreshTaskCount();
+  } catch (e) {
+    hideTyping();
+    addBubble('⚠️ Could not reach the server. Check your connection.', 'bot');
+  } finally {
+    sendBtn.disabled = false;
+    input.focus();
+  }
+}
+
+// ── Task panel ────────────────────────────────────────────────────────────
+async function refreshTaskCount() {
+  try {
+    const res = await fetch(`${API}/tasks`);
+    const tasks = await res.json();
+    badge.textContent = tasks.length;
+    badge.classList.toggle('show', tasks.length > 0);
+    statusText.textContent = tasks.length === 0
+      ? 'All caught up! 🎉'
+      : `${tasks.length} task${tasks.length !== 1 ? 's' : ''} pending`;
+  } catch {}
+}
+
+async function openTaskPanel() {
+  taskPanel.classList.add('open');
+  try {
+    const res = await fetch(`${API}/tasks`);
+    const tasks = await res.json();
+    if (tasks.length === 0) {
+      taskList.innerHTML = `<div class="empty-state"><div class="emoji">🎉</div><div>No pending tasks!</div></div>`;
+      return;
+    }
+    const priIcon = {1:'🔴', 2:'🟡', 3:'🟢'};
+    const catIcon = {it:'💻', general:'📋', personal:'👤'};
+    taskList.innerHTML = tasks.map(t => `
+      <div class="task-card" id="card-${t.id}">
+        <div class="task-pri">${priIcon[t.priority]||'⚪'}</div>
+        <div class="task-body">
+          <div class="task-title">${escHtml(t.title)}</div>
+          <div class="task-meta">
+            <span>${catIcon[t.category]||'📋'} ${t.category}</span>
+            ${t.due_at ? `<span>⏰ ${t.due_at.slice(0,16)}</span>` : ''}
+          </div>
+        </div>
+        <button class="done-btn" onclick="quickDone(${t.id})">✓</button>
+      </div>
+    `).join('');
+  } catch {
+    taskList.innerHTML = `<div class="empty-state"><div class="emoji">⚠️</div><div>Couldn't load tasks</div></div>`;
+  }
+}
+
+async function quickDone(id) {
+  const card = document.getElementById(`card-${id}`);
+  if (card) { card.style.opacity='0.4'; card.style.pointerEvents='none'; }
+  await fetch(`${API}/tasks/${id}/done`, {method:'POST'});
+  await openTaskPanel();
+  refreshTaskCount();
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── Push notifications ────────────────────────────────────────────────────
+async function setupPush() {
+  if (IS_NATIVE) {
+    // Running as Android APK — use Capacitor Push Notifications
+    setupCapacitorPush();
+  } else {
+    addBubble('Push notifications work in the Android app. In the browser, reminders fire automatically when the server checks.', 'bot');
+  }
+}
+
+async function setupCapacitorPush() {
+  try {
+    const { PushNotifications } = window.CapacitorPlugins || {};
+    if (!PushNotifications) {
+      addBubble('Push plugin not loaded. Make sure you built the app with Capacitor.', 'bot');
+      return;
+    }
+
+    const permResult = await PushNotifications.requestPermissions();
+    if (permResult.receive !== 'granted') {
+      addBubble('Notification permission denied. Enable it in Android Settings → Apps → TaskBot.', 'bot');
+      return;
+    }
+
+    await PushNotifications.register();
+
+    PushNotifications.addListener('registration', async (token) => {
+      // Send FCM token to our backend
+      await fetch(`${API}/push/fcm-subscribe`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({token: token.value}),
+      });
+      notifBtn.textContent = '🔔✓';
+      addBubble('🔔 Push notifications enabled! Reminders will now notify you even when the app is closed.', 'bot');
+    });
+
+    PushNotifications.addListener('registrationError', (err) => {
+      addBubble(`Notification setup failed: ${err.error}`, 'bot');
+    });
+
+    PushNotifications.addListener('pushNotificationReceived', (notification) => {
+      // App is open — show as chat bubble
+      addBubble(`⏰ **Reminder:** ${notification.body}`, 'bot');
+    });
+
+    PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
+      if (action.actionId === 'done' && action.notification.data?.task_id) {
+        fetch(`${API}/tasks/${action.notification.data.task_id}/done`, {method:'POST'});
+        addBubble(`✅ Task marked complete from notification.`, 'bot');
+        refreshTaskCount();
+      }
+    });
+
+  } catch (e) {
+    addBubble(`Push setup error: ${e.message}`, 'bot');
+  }
+}
+
+// ── Event listeners ───────────────────────────────────────────────────────
+sendBtn.addEventListener('click', () => sendMessage(input.value.trim()));
+
+input.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage(input.value.trim());
+  }
+});
+
+input.addEventListener('input', () => {
+  input.style.height = 'auto';
+  input.style.height = Math.min(input.scrollHeight, 100) + 'px';
+});
+
+tasksBtn.addEventListener('click', openTaskPanel);
+closePanel.addEventListener('click', () => taskPanel.classList.remove('open'));
+notifBtn.addEventListener('click', setupPush);
+
+document.querySelectorAll('.quick-btn').forEach(btn => {
+  btn.addEventListener('click', () => sendMessage(btn.dataset.msg));
+});
+
+// ── Knowledge Base ────────────────────────────────────────────────────────
+const kbPanel    = document.getElementById('kb-panel');
+const kbViewer   = document.getElementById('kb-viewer');
+const kbEditor   = document.getElementById('kb-editor');
+const kbListEl   = document.getElementById('kb-list');
+const kbSearch   = document.getElementById('kb-search');
+const kbContent  = document.getElementById('kb-content');
+const kbImagesGrid = document.getElementById('kb-images-grid');
+const kbLightbox = document.getElementById('kb-lightbox');
+const kbLightboxImg = document.getElementById('kb-lightbox-img');
+
+let currentArticleId = null;
+
+// ── Markdown renderer (extended) ──────────────────────────────────────────
+function renderMarkdown(md) {
+  if (!md) return '';
+  let html = escHtml(md);
+
+  // Blockquotes with callout detection
+  html = html.replace(/^&gt; (.+)$/gm, (_, content) => {
+    if (content.includes('⚠️') || content.toLowerCase().includes('unless') || content.toLowerCase().includes('warning')) {
+      return `<div class="callout warn">${content}</div>`;
+    }
+    if (content.includes('🚨') || content.toLowerCase().includes('danger')) {
+      return `<div class="callout danger">${content}</div>`;
+    }
+    return `<div class="callout">${content}</div>`;
+  });
+
+  // Code blocks
+  html = html.replace(/```[\s\S]*?```/g, m => `<pre><code>${m.slice(3, -3).trim()}</code></pre>`);
+
+  // Inline code
+  html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+  // Headings
+  html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+  html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+  html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+
+  // Bold / italic
+  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+
+  // Horizontal rule
+  html = html.replace(/^---$/gm, '<hr>');
+
+  // Ordered list
+  html = html.replace(/^(\d+)\. (.+)$/gm, '<li>$2</li>');
+  html = html.replace(/(<li>.*<\/li>\n?)+/g, m => `<ol>${m}</ol>`);
+
+  // Unordered list
+  html = html.replace(/^[-*] (.+)$/gm, '<li>$1</li>');
+  html = html.replace(/(<li>.*<\/li>\n?)+/g, m => {
+    if (m.includes('<ol>')) return m;
+    return `<ul>${m}</ul>`;
+  });
+
+  // Paragraphs (lines not already wrapped)
+  html = html.replace(/^(?!<[houlpd])(.+)$/gm, '<p>$1</p>');
+  html = html.replace(/<p><\/p>/g, '');
+
+  // Links
+  html = html.replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" target="_blank">$1</a>');
+
+  return html;
+}
+
+// ── KB Article list ───────────────────────────────────────────────────────
+async function loadKbList(q = '') {
+  const url = q ? `${API}/kb?q=${encodeURIComponent(q)}` : `${API}/kb`;
+  try {
+    const res = await fetch(url);
+    const articles = await res.json();
+    if (!articles.length) {
+      kbListEl.innerHTML = `<div class="empty-state">
+        <div class="emoji">📝</div>
+        <div>${q ? 'No results for "' + escHtml(q) + '"' : 'No processes yet.<br>Tap + New to add your first one.'}</div>
+      </div>`;
+      return;
+    }
+    kbListEl.innerHTML = articles.map(a => {
+      const tags = a.tags ? a.tags.split(',').filter(Boolean).map(t =>
+        `<span class="kb-tag">${escHtml(t.trim())}</span>`).join('') : '';
+      const updated = new Date(a.updated_at).toLocaleDateString();
+      return `<div class="kb-card" onclick="openArticle(${a.id})">
+        <div class="kb-card-title">${escHtml(a.title)}</div>
+        <div class="kb-card-meta">${tags}<span>Updated ${updated}</span></div>
+      </div>`;
+    }).join('');
+  } catch {
+    kbListEl.innerHTML = `<div class="empty-state"><div class="emoji">⚠️</div><div>Couldn't load processes</div></div>`;
+  }
+}
+
+async function openArticle(id) {
+  currentArticleId = id;
+  try {
+    const res = await fetch(`${API}/kb/${id}`);
+    const article = await res.json();
+
+    document.getElementById('viewer-title').textContent = article.title;
+    kbContent.innerHTML = renderMarkdown(article.content);
+
+    // Images
+    if (article.images && article.images.length) {
+      document.getElementById('kb-images-section').style.display = 'block';
+      kbImagesGrid.innerHTML = article.images.map(img => `
+        <div class="kb-image-thumb">
+          <img src="${img.data}" alt="${escHtml(img.filename)}" onclick="openLightbox('${img.data}')">
+          <button class="del-img" onclick="deleteImage(event,${img.id},${id})">✕</button>
+        </div>
+      `).join('');
+    } else {
+      kbImagesGrid.innerHTML = '';
+    }
+
+    kbViewer.classList.add('open');
+  } catch {
+    alert('Could not load article.');
+  }
+}
+
+async function deleteImage(e, imageId, articleId) {
+  e.stopPropagation();
+  if (!confirm('Delete this screenshot?')) return;
+  await fetch(`${API}/kb/images/${imageId}`, {method:'DELETE'});
+  openArticle(articleId);
+}
+
+function openLightbox(src) {
+  kbLightboxImg.src = src;
+  kbLightbox.classList.add('open');
+}
+
+// ── KB Editor ─────────────────────────────────────────────────────────────
+function openEditor(article = null) {
+  document.getElementById('editor-title-label').textContent = article ? 'Edit Process' : 'New Process';
+  document.getElementById('article-title-input').value = article?.title || '';
+  document.getElementById('article-tags-input').value = article?.tags || '';
+  document.getElementById('kb-textarea').value = article?.content || '';
+  kbEditor.classList.add('open');
+}
+
+async function saveArticle() {
+  const title = document.getElementById('article-title-input').value.trim();
+  const tags  = document.getElementById('article-tags-input').value.trim();
+  const content = document.getElementById('kb-textarea').value;
+
+  if (!title) { alert('Please enter a title.'); return; }
+
+  const body = JSON.stringify({title, content, tags});
+  const headers = {'Content-Type': 'application/json'};
+
+  if (currentArticleId && kbViewer.classList.contains('open')) {
+    await fetch(`${API}/kb/${currentArticleId}`, {method:'PUT', headers, body});
+    kbEditor.classList.remove('open');
+    openArticle(currentArticleId);
+  } else {
+    const res = await fetch(`${API}/kb`, {method:'POST', headers, body});
+    const data = await res.json();
+    currentArticleId = data.id;
+    kbEditor.classList.remove('open');
+    openArticle(data.id);
+  }
+  loadKbList();
+}
+
+async function deleteArticle() {
+  if (!currentArticleId) return;
+  if (!confirm('Delete this process? This cannot be undone.')) return;
+  await fetch(`${API}/kb/${currentArticleId}`, {method:'DELETE'});
+  kbViewer.classList.remove('open');
+  currentArticleId = null;
+  loadKbList();
+}
+
+// ── Image upload ──────────────────────────────────────────────────────────
+document.getElementById('add-image-input').addEventListener('change', async (e) => {
+  const files = Array.from(e.target.files);
+  for (const file of files) {
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      await fetch(`${API}/kb/${currentArticleId}/images`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({filename: file.name, data: ev.target.result}),
+      });
+      openArticle(currentArticleId);
+    };
+    reader.readAsDataURL(file);
+  }
+  e.target.value = '';
+});
+
+// Paste images directly into viewer
+document.addEventListener('paste', async (e) => {
+  if (!kbViewer.classList.contains('open') || !currentArticleId) return;
+  const items = Array.from(e.clipboardData?.items || []);
+  const imageItem = items.find(i => i.type.startsWith('image/'));
+  if (!imageItem) return;
+  const file = imageItem.getAsFile();
+  const reader = new FileReader();
+  reader.onload = async (ev) => {
+    await fetch(`${API}/kb/${currentArticleId}/images`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({filename: `screenshot-${Date.now()}.png`, data: ev.target.result}),
+    });
+    openArticle(currentArticleId);
+  };
+  reader.readAsDataURL(file);
+});
+
+// ── Toolbar buttons ───────────────────────────────────────────────────────
+document.querySelectorAll('.tb-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const ta = document.getElementById('kb-textarea');
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    const selected = ta.value.substring(start, end);
+
+    if (btn.dataset.wrap) {
+      const w = btn.dataset.wrap;
+      ta.setRangeText(`${w}${selected || 'text'}${w}`, start, end, 'select');
+    } else if (btn.dataset.insert) {
+      const ins = btn.dataset.insert.replace(/&#10;/g, '\n').replace(/\\\`/g, '`');
+      ta.setRangeText(ins, start, start, 'end');
+    }
+    ta.focus();
+  });
+});
+
+// ── KB event listeners ────────────────────────────────────────────────────
+document.getElementById('kb-btn').addEventListener('click', () => {
+  kbPanel.classList.add('open');
+  loadKbList();
+});
+document.getElementById('close-kb').addEventListener('click', () => {
+  kbPanel.classList.remove('open');
+  kbViewer.classList.remove('open');
+  kbEditor.classList.remove('open');
+  currentArticleId = null;
+});
+document.getElementById('close-viewer').addEventListener('click', () => {
+  kbViewer.classList.remove('open');
+  currentArticleId = null;
+});
+document.getElementById('close-editor').addEventListener('click', () => kbEditor.classList.remove('open'));
+document.getElementById('new-article-btn').addEventListener('click', () => {
+  currentArticleId = null;
+  openEditor();
+});
+document.getElementById('edit-article-btn').addEventListener('click', async () => {
+  const res = await fetch(`${API}/kb/${currentArticleId}`);
+  const a = await res.json();
+  openEditor(a);
+});
+document.getElementById('delete-article-btn').addEventListener('click', deleteArticle);
+document.getElementById('save-article-btn').addEventListener('click', saveArticle);
+document.getElementById('kb-lightbox-close').addEventListener('click', () => kbLightbox.classList.remove('open'));
+kbLightbox.addEventListener('click', e => { if (e.target === kbLightbox) kbLightbox.classList.remove('open'); });
+
+// Add image shortcut label click
+document.querySelector('label[for="add-image-input"], label:has(#add-image-input)') &&
+  document.querySelector('label:has(#add-image-input)')?.addEventListener('click', () =>
+    document.getElementById('add-image-input').click());
+
+// Search debounce
+let searchTimer;
+kbSearch.addEventListener('input', () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => loadKbList(kbSearch.value), 300);
+});
+
+// ── Welcome ───────────────────────────────────────────────────────────────
+(function init() {
+  addBubble(
+    "👋 Hey Jacob! I'm **TaskBot**.\n\n" +
+    "Just type anything to add a task:\n" +
+    "• *patch the switches tonight*\n" +
+    "• *call dentist tomorrow*\n" +
+    "• *urgent: check backup logs*\n\n" +
+    "Say **next** to get a nudge on what to tackle first. 🎯\n\n" +
+    (IS_NATIVE ? "Tap 🔔 to enable push notifications." : ""),
+    'bot'
+  );
+  refreshTaskCount();
+})();
+</script>
+</body>
+</html>
