@@ -519,18 +519,20 @@ def serve_sw():
 # Set env vars: TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER
 # Your phone number (only you can text in): ALLOWED_PHONE=+1xxxxxxxxxx
 
-from fastapi import Request, Form
+from fastapi import Request
 from fastapi.responses import PlainTextResponse
+from urllib.parse import parse_qs
 
 ALLOWED_PHONE = os.environ.get("ALLOWED_PHONE", "")  # e.g. "+14155551234"
 
 
 @app.post("/sms", response_class=PlainTextResponse)
-async def sms_webhook(
-    From: str = Form(...),
-    Body: str = Form(...),
-):
-    """Twilio SMS webhook — receives your texts and replies."""
+async def sms_webhook(request: Request):
+    raw = await request.body()
+    params = parse_qs(raw.decode())
+    From = params.get("From", [""])[0]
+    Body = params.get("Body", [""])[0]
+
     if ALLOWED_PHONE and From != ALLOWED_PHONE:
         return "<?xml version='1.0'?><Response></Response>"
 
